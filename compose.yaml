@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: taskflow_db
+    environment:
+      POSTGRES_DB: taskflow
+      POSTGRES_USER: alina
+      POSTGRES_PASSWORD: tomchak
+    ports:
+      - "5434:5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: taskflow_cache
+    ports:
+      - "6379:6379"

@@ -1,0 +1,9 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5434/taskflow
+    username: alina
+    password: tomchak
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
