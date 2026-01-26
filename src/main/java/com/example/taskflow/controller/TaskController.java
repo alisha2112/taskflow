@@ -2,6 +2,7 @@ package com.example.taskflow.controller;
 
 import com.example.taskflow.model.dto.TaskRequestDto;
 import com.example.taskflow.model.dto.TaskResponseDto;
+import com.example.taskflow.model.entity.TaskPriority;
 import com.example.taskflow.model.entity.User;
 import com.example.taskflow.service.TaskService;
 import jakarta.validation.Valid;
@@ -20,8 +21,10 @@ public class TaskController {
 
     @GetMapping("/board/{boardId}")
     public List<TaskResponseDto> getByBoard(@PathVariable Long boardId,
-                                            @AuthenticationPrincipal User currenyUser) {
-        return taskService.getTasksByBoard(boardId, currenyUser.getId());
+                                            @AuthenticationPrincipal User currenyUser,
+                                            @RequestParam(required = false) TaskPriority priority,
+                                            @RequestParam(required = false) Long assigneeId) {
+        return taskService.getTasksByBoard(boardId, currenyUser.getId(), priority, assigneeId);
     }
 
     @PostMapping
@@ -36,6 +39,13 @@ public class TaskController {
                                  @RequestBody @Valid TaskRequestDto dto,
                                  @AuthenticationPrincipal User currentUser) {
         return taskService.updateTask(id, dto, currentUser.getId());
+    }
+
+    @PatchMapping("/{id}/assign")
+    public TaskResponseDto assignTask(@PathVariable Long id,
+                                      @RequestParam(required = false) Long userId,
+                                      @AuthenticationPrincipal User currentUser) {
+        return taskService.assignTask(id, userId, currentUser.getId());
     }
 
     @DeleteMapping("/{id}")

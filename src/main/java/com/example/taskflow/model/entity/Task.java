@@ -32,6 +32,9 @@ public class Task {
 
     private LocalDateTime deadline;
 
+    @Column(nullable = false)
+    private boolean isArchived;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assignee_id")
     private User assignee;

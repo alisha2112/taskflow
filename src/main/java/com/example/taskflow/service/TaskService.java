@@ -1,11 +1,15 @@
 package com.example.taskflow.service;
 
+import com.example.taskflow.model.dto.AssigneeDto;
 import com.example.taskflow.model.dto.TaskRequestDto;
 import com.example.taskflow.model.dto.TaskResponseDto;
 import com.example.taskflow.model.entity.Board;
 import com.example.taskflow.model.entity.Task;
+import com.example.taskflow.model.entity.TaskPriority;
+import com.example.taskflow.model.entity.User;
 import com.example.taskflow.repository.BoardRepository;
 import com.example.taskflow.repository.TaskRepository;
+import com.example.taskflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,11 +21,12 @@ import java.util.List;
 public class TaskService {
     private final TaskRepository taskRepository;
     private final BoardRepository boardRepository;
+    private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
-    public List<TaskResponseDto> getTasksByBoard(Long boardId, Long userId) {
+    public List<TaskResponseDto> getTasksByBoard(Long boardId, Long userId, TaskPriority priority, Long assigneeId) {
         validateBoardAccess(boardId, userId);
-        return taskRepository.findAllByBoardId(boardId).stream()
+        return taskRepository.findByBoardIdWithFilters(boardId, priority, assigneeId).stream()
                 .map(this::mapToResponse)
                 .toList();
     }
@@ -62,7 +67,26 @@ public class TaskService {
 
         validateBoardAccess(task.getBoard().getId(), userId);
 
-        taskRepository.delete(task);
+        task.setArchived(true);
+        taskRepository.save(task);
+    }
+    
+    @Transactional
+    public TaskResponseDto assignTask(Long taskId, Long assigneeId, Long userId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Task not found"));
+        
+        validateBoardAccess(task.getBoard().getId(), userId);
+
+        if (assigneeId != null) {
+            User assignee = userRepository.findById(assigneeId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            task.setAssignee(assignee);
+        } else {
+            task.setAssignee(null);
+        }
+
+        return mapToResponse(taskRepository.save(task));
     }
 
     private Board validateBoardAccess(Long boardId, Long userId) {
@@ -77,6 +101,16 @@ public class TaskService {
     }
 
     private TaskResponseDto mapToResponse(Task task) {
+        AssigneeDto assigneeDto = null;
+
+        if (task.getAssignee() != null) {
+            assigneeDto = new AssigneeDto(
+                    task.getAssignee().getId(),
+                    task.getAssignee().getUsername(),
+                    task.getAssignee().getEmail()
+            );
+        }
+
         return new TaskResponseDto(
                 task.getId(),
                 task.getTitle(),
@@ -84,7 +118,9 @@ public class TaskService {
                 task.getStatus(),
                 task.getPriority(),
                 task.getBoard().getId(),
-                task.getDeadline()
+                task.getDeadline(),
+                task.isArchived(),
+                assigneeDto
         );
     }
 }

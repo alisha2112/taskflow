@@ -7,4 +7,6 @@
 
     <include file="/db/changelog/changeset/create-tables.sql"/>
     <include file="/db/changelog/changeset/add-indexes.sql"/>
+    <include file="/db/changelog/changeset/add-is-archived-to-tasks.sql"/>
+    <include file="/db/changelog/changeset/insert-mock-data.sql"/>
 </databaseChangeLog>

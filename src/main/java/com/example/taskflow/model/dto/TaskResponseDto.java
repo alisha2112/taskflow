@@ -12,5 +12,7 @@ public record TaskResponseDto (
         TaskStatus status,
         TaskPriority priority,
         Long boardId,
-        LocalDateTime deadline
+        LocalDateTime deadline,
+        boolean isArchived,
+        AssigneeDto assignee
 ){}
