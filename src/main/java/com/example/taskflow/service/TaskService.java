@@ -1,5 +1,7 @@
 package com.example.taskflow.service;
 
+import com.example.taskflow.exception.AccessDeniedException;
+import com.example.taskflow.exception.ResourceNotFoundException;
 import com.example.taskflow.model.dto.AssigneeDto;
 import com.example.taskflow.model.dto.TaskRequestDto;
 import com.example.taskflow.model.dto.TaskResponseDto;
@@ -11,6 +13,7 @@ import com.example.taskflow.repository.BoardRepository;
 import com.example.taskflow.repository.TaskRepository;
 import com.example.taskflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +21,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TaskService {
     private final TaskRepository taskRepository;
     private final BoardRepository boardRepository;
@@ -25,6 +29,8 @@ public class TaskService {
 
     @Transactional(readOnly = true)
     public List<TaskResponseDto> getTasksByBoard(Long boardId, Long userId, TaskPriority priority, Long assigneeId) {
+        log.debug("Fetching tasks for board {} by user {}", boardId, userId);
+
         validateBoardAccess(boardId, userId);
         return taskRepository.findByBoardIdWithFilters(boardId, priority, assigneeId).stream()
                 .map(this::mapToResponse)
@@ -42,15 +48,25 @@ public class TaskService {
         task.setPriority(dto.priority());
         task.setBoard(board);
 
+        Task savedTask = taskRepository.save(task);
+
+        log.info("Task created: ID={} Title='{}' BoardID={} by UserID={}",
+                savedTask.getId(), savedTask.getTitle(), board.getId(), userId);
+
         return mapToResponse(taskRepository.save(task));
     }
 
     @Transactional
     public TaskResponseDto updateTask(Long taskId, TaskRequestDto dto, Long userId) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new RuntimeException("Task not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + taskId));
 
         validateBoardAccess(task.getBoard().getId(), userId);
+
+        if (task.getStatus() != dto.status()) {
+            log.info("Task status changed: ID={} From={} To={} by UserID={}",
+                    taskId, task.getStatus(), dto.status(), userId);
+        }
 
         task.setTitle(dto.title());
         task.setDescription(dto.description());
@@ -63,27 +79,31 @@ public class TaskService {
     @Transactional
     public void deleteTask(Long taskId, Long userId) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new RuntimeException("Task not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + taskId));
 
         validateBoardAccess(task.getBoard().getId(), userId);
 
         task.setArchived(true);
         taskRepository.save(task);
+
+        log.info("Task archived: ID={} by UserID={}", taskId, userId);
     }
     
     @Transactional
     public TaskResponseDto assignTask(Long taskId, Long assigneeId, Long userId) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new RuntimeException("Task not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + taskId));
         
         validateBoardAccess(task.getBoard().getId(), userId);
 
         if (assigneeId != null) {
             User assignee = userRepository.findById(assigneeId)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + assigneeId));
             task.setAssignee(assignee);
+            log.info("Task assigned: ID={} to UserID={} by OwnerID={}", taskId, assigneeId, userId);
         } else {
             task.setAssignee(null);
+            log.info("Task unassigned: ID={} by OwnerID={}", taskId, userId);
         }
 
         return mapToResponse(taskRepository.save(task));
@@ -91,10 +111,12 @@ public class TaskService {
 
     private Board validateBoardAccess(Long boardId, Long userId) {
         Board board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new RuntimeException("Board not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Board not found with id: " + boardId));
 
         if (!board.getOwner().getId().equals(userId)) {
-            throw new RuntimeException("You don't have permission to access this board");
+            log.warn("Access denied: UserID={} tried to access BoardID={} owned by UserID={}",
+                    userId, boardId, board.getOwner().getId());
+            throw new AccessDeniedException("You don't have permission to access this board");
         }
 
         return board;

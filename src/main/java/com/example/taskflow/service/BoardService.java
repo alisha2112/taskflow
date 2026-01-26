@@ -1,5 +1,7 @@
 package com.example.taskflow.service;
 
+import com.example.taskflow.exception.AccessDeniedException;
+import com.example.taskflow.exception.ResourceNotFoundException;
 import com.example.taskflow.model.dto.BoardRequestDto;
 import com.example.taskflow.model.dto.BoardResponseDto;
 import com.example.taskflow.model.entity.Board;
@@ -49,10 +51,10 @@ public class BoardService {
 
     private Board findAndValidateOwner(Long boardId, Long userId) {
         Board board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new RuntimeException("Board not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Board not found with id: " + boardId));
 
         if (!board.getOwner().getId().equals(userId)) {
-            throw new RuntimeException("You don`t have permission to edit this board");
+            throw new AccessDeniedException("You don`t have permission to edit this board");
         }
 
         return board;
