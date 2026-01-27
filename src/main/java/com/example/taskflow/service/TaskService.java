@@ -14,6 +14,8 @@ import com.example.taskflow.repository.TaskRepository;
 import com.example.taskflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,9 +30,9 @@ public class TaskService {
     private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "tasks", key = "{#boardId, #priority != null ? #priority.name() : 'null', #assigneeId != null ? #assigneeId : 'null'}")
     public List<TaskResponseDto> getTasksByBoard(Long boardId, Long userId, TaskPriority priority, Long assigneeId) {
         log.debug("Fetching tasks for board {} by user {}", boardId, userId);
-
         validateBoardAccess(boardId, userId);
         return taskRepository.findByBoardIdWithFilters(boardId, priority, assigneeId).stream()
                 .map(this::mapToResponse)
@@ -38,6 +40,7 @@ public class TaskService {
     }
 
     @Transactional
+    @CacheEvict(value = "tasks", allEntries = true)
     public TaskResponseDto createTask(TaskRequestDto dto, Long userId) {
         Board board = validateBoardAccess(dto.boardId(), userId);
 
@@ -57,6 +60,7 @@ public class TaskService {
     }
 
     @Transactional
+    @CacheEvict(value = "tasks", allEntries = true)
     public TaskResponseDto updateTask(Long taskId, TaskRequestDto dto, Long userId) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + taskId));
@@ -77,6 +81,7 @@ public class TaskService {
     }
 
     @Transactional
+    @CacheEvict(value = "tasks", allEntries = true)
     public void deleteTask(Long taskId, Long userId) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + taskId));

@@ -1,7 +1,7 @@
 INSERT INTO users (username, email, password) VALUES
-('alina_dev', 'alina@example.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy'),
-('mark_colleague', 'mark@example.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy'),
-('jane_manager', 'jane@example.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy');
+('alina_dev', 'alina@example.com', '$2y$10$7SBxHP1X.Z3Zz1cI79gFGuHvVUa4eOLXzO1pJV.RyqC.I7koSPg52'),
+('mark_colleague', 'mark@example.com', '$2y$10$7SBxHP1X.Z3Zz1cI79gFGuHvVUa4eOLXzO1pJV.RyqC.I7koSPg52'),
+('jane_manager', 'jane@example.com', '$2y$10$7SBxHP1X.Z3Zz1cI79gFGuHvVUa4eOLXzO1pJV.RyqC.I7koSPg52');
 
 INSERT INTO boards (title, owner_id) VALUES
 ('TaskFlow Development', 1),
