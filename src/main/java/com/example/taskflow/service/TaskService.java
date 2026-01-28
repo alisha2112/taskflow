@@ -6,6 +6,7 @@ import com.example.taskflow.model.dto.AssigneeDto;
 import com.example.taskflow.model.dto.TaskRequestDto;
 import com.example.taskflow.model.dto.TaskResponseDto;
 import com.example.taskflow.model.dto.event.EventType;
+import com.example.taskflow.model.dto.event.NotificationDto;
 import com.example.taskflow.model.dto.event.TaskEventDto;
 import com.example.taskflow.model.entity.Board;
 import com.example.taskflow.model.entity.Task;
@@ -156,6 +157,7 @@ public class TaskService {
                     .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + assigneeId));
             task.setAssignee(assignee);
             log.info("Task assigned: ID={} to UserID={} by OwnerID={}", taskId, assigneeId, userId);
+            sendNotificationToUser(assignee.getEmail(), task);
         } else {
             task.setAssignee(null);
             log.info("Task unassigned: ID={} by OwnerID={}", taskId, userId);
@@ -169,11 +171,23 @@ public class TaskService {
         return responseDto;
     }
 
+    private void sendNotificationToUser(String username, Task task) {
+        NotificationDto notification = new NotificationDto(
+                "You have been assigned to a task: " + task.getTitle(),
+                task.getId(),
+                task.getBoard().getId(),
+                "ASSIGNMENT"
+        );
+
+        log.debug("Sending private notification to user {} ", username);
+        messagingTemplate.convertAndSendToUser(username, "/queue/notifications", notification);
+    }
+
     private void sendBoardUpdate(Long boardId, EventType eventType, TaskResponseDto taskDto) {
         String destination = "/topic/board/" + boardId;
         TaskEventDto event = new TaskEventDto(eventType, boardId, taskDto);
 
-        log.debug("Sending WebSocket event {} to {}", eventType, destination);
+        log.info("Sending WebSocket event {} to {}", eventType, destination);
         messagingTemplate.convertAndSend(destination, event);
     }
 
