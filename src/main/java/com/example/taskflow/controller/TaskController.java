@@ -21,10 +21,10 @@ public class TaskController {
 
     @GetMapping("/board/{boardId}")
     public List<TaskResponseDto> getByBoard(@PathVariable Long boardId,
-                                            @AuthenticationPrincipal User currenyUser,
+                                            @AuthenticationPrincipal User currentUser,
                                             @RequestParam(required = false) TaskPriority priority,
                                             @RequestParam(required = false) Long assigneeId) {
-        return taskService.getTasksByBoard(boardId, currenyUser.getId(), priority, assigneeId);
+        return taskService.getTasksByBoard(boardId, currentUser.getId(), priority, assigneeId);
     }
 
     @PostMapping
@@ -39,6 +39,13 @@ public class TaskController {
                                  @RequestBody @Valid TaskRequestDto dto,
                                  @AuthenticationPrincipal User currentUser) {
         return taskService.updateTask(id, dto, currentUser.getId());
+    }
+
+    @PatchMapping("/{id}")
+    public TaskResponseDto patchUpdate(@PathVariable Long id,
+                                       @RequestBody TaskRequestDto dto,
+                                       @AuthenticationPrincipal User currentUser) {
+        return taskService.patchUpdateTask(id, dto, currentUser.getId());
     }
 
     @PatchMapping("/{id}/assign")

@@ -5,6 +5,8 @@ import com.example.taskflow.exception.ResourceNotFoundException;
 import com.example.taskflow.model.dto.AssigneeDto;
 import com.example.taskflow.model.dto.TaskRequestDto;
 import com.example.taskflow.model.dto.TaskResponseDto;
+import com.example.taskflow.model.dto.event.EventType;
+import com.example.taskflow.model.dto.event.TaskEventDto;
 import com.example.taskflow.model.entity.Board;
 import com.example.taskflow.model.entity.Task;
 import com.example.taskflow.model.entity.TaskPriority;
@@ -16,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +31,7 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final BoardRepository boardRepository;
     private final UserRepository userRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Transactional(readOnly = true)
     @Cacheable(value = "tasks", key = "{#boardId, #priority != null ? #priority.name() : 'null', #assigneeId != null ? #assigneeId : 'null'}")
@@ -52,11 +56,14 @@ public class TaskService {
         task.setBoard(board);
 
         Task savedTask = taskRepository.save(task);
+        TaskResponseDto responseDto = mapToResponse(savedTask);
 
         log.info("Task created: ID={} Title='{}' BoardID={} by UserID={}",
                 savedTask.getId(), savedTask.getTitle(), board.getId(), userId);
 
-        return mapToResponse(taskRepository.save(task));
+        sendBoardUpdate(board.getId(), EventType.TASK_CREATED, responseDto);
+
+        return responseDto;
     }
 
     @Transactional
@@ -77,7 +84,48 @@ public class TaskService {
         task.setStatus(dto.status());
         task.setPriority(dto.priority());
 
-        return mapToResponse(taskRepository.save(task));
+        Task savedTask = taskRepository.save(task);
+        TaskResponseDto responseDto = mapToResponse(savedTask);
+
+        sendBoardUpdate(task.getBoard().getId(), EventType.TASK_UPDATED, responseDto);
+
+        return responseDto;
+    }
+
+    @Transactional
+    @CacheEvict(value = "tasks", allEntries = true)
+    public TaskResponseDto patchUpdateTask(Long taskId, TaskRequestDto dto, Long userId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + taskId));
+
+        validateBoardAccess(task.getBoard().getId(), userId);
+
+        if (dto.title() != null) {
+            task.setTitle(dto.title());
+        }
+
+        if (dto.description() != null) {
+            task.setDescription(dto.description());
+        }
+
+        if (dto.status() != null) {
+            if (task.getStatus() != dto.status()) {
+                log.info("Task status changed (PATCH): ID={} From={} To={} by UserID={}",
+                        taskId, task.getStatus(), dto.status(), userId);
+            }
+            task.setStatus(dto.status());
+        }
+
+        if (dto.priority() != null) {
+            task.setPriority(dto.priority());
+        }
+
+        Task savedTask = taskRepository.save(task);
+        TaskResponseDto responseDto = mapToResponse(savedTask);
+
+        sendBoardUpdate(task.getBoard().getId(), EventType.TASK_UPDATED, responseDto);
+
+        return responseDto;
     }
 
     @Transactional
@@ -89,9 +137,11 @@ public class TaskService {
         validateBoardAccess(task.getBoard().getId(), userId);
 
         task.setArchived(true);
-        taskRepository.save(task);
+        Task savedTask = taskRepository.save(task);
 
         log.info("Task archived: ID={} by UserID={}", taskId, userId);
+
+        sendBoardUpdate(task.getBoard().getId(), EventType.TASK_DELETED, mapToResponse(savedTask));
     }
     
     @Transactional
@@ -111,7 +161,20 @@ public class TaskService {
             log.info("Task unassigned: ID={} by OwnerID={}", taskId, userId);
         }
 
-        return mapToResponse(taskRepository.save(task));
+        Task savedTask = taskRepository.save(task);
+        TaskResponseDto responseDto = mapToResponse(savedTask);
+
+        sendBoardUpdate(task.getBoard().getId(), EventType.TASK_UPDATED, responseDto);
+
+        return responseDto;
+    }
+
+    private void sendBoardUpdate(Long boardId, EventType eventType, TaskResponseDto taskDto) {
+        String destination = "/topic/board/" + boardId;
+        TaskEventDto event = new TaskEventDto(eventType, boardId, taskDto);
+
+        log.debug("Sending WebSocket event {} to {}", eventType, destination);
+        messagingTemplate.convertAndSend(destination, event);
     }
 
     private Board validateBoardAccess(Long boardId, Long userId) {
