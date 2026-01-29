@@ -9,4 +9,5 @@
     <include file="/db/changelog/changeset/add-indexes.sql"/>
     <include file="/db/changelog/changeset/add-is-archived-to-tasks.sql"/>
     <include file="/db/changelog/changeset/insert-mock-data.sql"/>
+    <include file="db/changelog/changeset/add-role-to-users.sql"/>
 </databaseChangeLog>
