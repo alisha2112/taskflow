@@ -8,6 +8,7 @@ import com.example.taskflow.service.TaskService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,12 +30,14 @@ public class TaskController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("@boardSecurity.isOwner(authentication, #dto.boardId())")
     public TaskResponseDto create(@RequestBody @Valid TaskRequestDto dto,
                                   @AuthenticationPrincipal User currentUser) {
         return taskService.createTask(dto, currentUser.getId());
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("@boardSecurity.isBoardOwnerOfTask(authentication, #id)")
     public TaskResponseDto update(@PathVariable Long id,
                                  @RequestBody @Valid TaskRequestDto dto,
                                  @AuthenticationPrincipal User currentUser) {
@@ -42,6 +45,7 @@ public class TaskController {
     }
 
     @PatchMapping("/{id}")
+    @PreAuthorize("@boardSecurity.isBoardOwnerOfTask(authentication, #id)")
     public TaskResponseDto patchUpdate(@PathVariable Long id,
                                        @RequestBody TaskRequestDto dto,
                                        @AuthenticationPrincipal User currentUser) {
@@ -49,6 +53,7 @@ public class TaskController {
     }
 
     @PatchMapping("/{id}/assign")
+    @PreAuthorize("@boardSecurity.isBoardOwnerOfTask(authentication, #id)")
     public TaskResponseDto assignTask(@PathVariable Long id,
                                       @RequestParam(required = false) Long userId,
                                       @AuthenticationPrincipal User currentUser) {
@@ -57,6 +62,7 @@ public class TaskController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("@boardSecurity.isBoardOwnerOfTask(authentication, #id)")
     public void delete(@PathVariable Long id,
                        @AuthenticationPrincipal User currentUser) {
         taskService.deleteTask(id, currentUser.getId());

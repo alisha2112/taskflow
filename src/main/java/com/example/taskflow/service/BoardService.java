@@ -1,13 +1,11 @@
 package com.example.taskflow.service;
 
-import com.example.taskflow.exception.AccessDeniedException;
 import com.example.taskflow.exception.ResourceNotFoundException;
 import com.example.taskflow.model.dto.BoardRequestDto;
 import com.example.taskflow.model.dto.BoardResponseDto;
 import com.example.taskflow.model.entity.Board;
 import com.example.taskflow.model.entity.User;
 import com.example.taskflow.repository.BoardRepository;
-import com.example.taskflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -22,11 +20,10 @@ import java.util.List;
 @Slf4j
 public class BoardService {
     private final BoardRepository boardRepository;
-    private final UserRepository userRepository;
 
     @Transactional
     @Cacheable(value = "boards", key = "#userId")
-    public List<BoardResponseDto> getAllBoards(Long userId) {
+    public List<BoardResponseDto> getAllBoardsByOwner(Long userId) {
         log.debug("Fetching boards for user ID: {}", userId);
         return boardRepository.findAllByOwnerId(userId).stream()
                 .map(this::mapToResponse)
@@ -44,17 +41,18 @@ public class BoardService {
         log.info("Board created: ID={} Title='{}' by UserID={}",
                 savedBoard.getId(), savedBoard.getTitle(), owner.getId());
 
-        return mapToResponse(boardRepository.save(board));
+        return mapToResponse(savedBoard);
     }
 
     @Transactional
-    @CacheEvict(value = "boards", key = "#userId")
-    public BoardResponseDto updateBoard(Long boardId, BoardRequestDto dto, Long userId) {
-        Board board = findAndValidateOwner(boardId, userId);
+    @CacheEvict(value = "boards", allEntries = true)
+    public BoardResponseDto updateBoard(Long boardId, BoardRequestDto dto) {
+        Board board = boardRepository.findById(boardId)
+                .orElseThrow(() -> new ResourceNotFoundException("Board not found with id: " + boardId));
 
         if (!board.getTitle().equals(dto.title())) {
-            log.info("Board title changed: ID={} From='{}' To='{}' by UserID={}",
-                    boardId, board.getTitle(), dto.title(), userId);
+            log.info("Board title changed: ID={} From='{}' To='{}'",
+                    boardId, board.getTitle(), dto.title());
         }
 
         board.setTitle(dto.title());
@@ -62,25 +60,14 @@ public class BoardService {
     }
 
     @Transactional
-    @CacheEvict(value = "boards", key = "#userId")
-    public void deleteBoard(Long boardId, Long userId) {
-        Board board = findAndValidateOwner(boardId, userId);
-        boardRepository.delete(board);
-
-        log.info("Board deleted: ID={} by UserID={}", boardId, userId);
-    }
-
-    private Board findAndValidateOwner(Long boardId, Long userId) {
-        Board board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new ResourceNotFoundException("Board not found with id: " + boardId));
-
-        if (!board.getOwner().getId().equals(userId)) {
-            log.warn("Access denied: UserID={} tried to modify BoardID={} owned by UserID={}",
-                    userId, boardId, board.getOwner().getId());
-            throw new AccessDeniedException("You don`t have permission to edit this board");
+    @CacheEvict(value = "boards", allEntries = true)
+    public void deleteBoard(Long boardId) {
+        if (!boardRepository.existsById(boardId)) {
+            throw new ResourceNotFoundException("Board not found with id: " + boardId);
         }
+        boardRepository.deleteById(boardId);
 
-        return board;
+        log.info("Board deleted: ID={}", boardId);
     }
 
     private BoardResponseDto mapToResponse(Board board) {

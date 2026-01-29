@@ -24,9 +24,8 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
             @Param("priority") TaskPriority priority,
             @Param("assigneeId") Long assigneeId
     );
-    List<Task> findAllByBoardId(Long boardId);
     @Query("SELECT t FROM Task t WHERE t.deadline BETWEEN :start AND :end " +
     "AND t.status != 'DONE' AND t.isArchived = false")
-    List<Task> findALlByDeadlineBetween(@Param("start")LocalDateTime start,
+    List<Task> findAllByDeadlineBetween(@Param("start")LocalDateTime start,
                                         @Param("end") LocalDateTime end);
 }

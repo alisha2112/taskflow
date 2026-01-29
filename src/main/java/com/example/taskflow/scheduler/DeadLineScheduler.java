@@ -20,9 +20,7 @@ public class DeadLineScheduler {
     private final TaskRepository taskRepository;
     private final NotificationService notificationService;
 
-//    @Scheduled(cron = "0 0 * * * *")
-
-    @Scheduled(cron = "*/30 * * * * *")
+    @Scheduled(cron = "0 0 * * * *")
     @Transactional
     public void checkUpcomingDeadlines() {
         log.info("Checking for upcoming deadlines...");
@@ -31,7 +29,7 @@ public class DeadLineScheduler {
         LocalDateTime startWindow = now.plusHours(24);
         LocalDateTime endWindow = now.plusHours(25);
 
-        List<Task> tasksDue = taskRepository.findALlByDeadlineBetween(now, endWindow);
+        List<Task> tasksDue = taskRepository.findAllByDeadlineBetween(endWindow, endWindow);
 
         if (tasksDue.isEmpty()) {
             log.info("No tasks due in 24 hours found.");
