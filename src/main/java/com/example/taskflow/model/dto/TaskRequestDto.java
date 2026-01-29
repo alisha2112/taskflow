@@ -5,6 +5,8 @@ import com.example.taskflow.model.entity.TaskStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
+import java.time.LocalDateTime;
+
 public record TaskRequestDto (
         @NotBlank(message = "Title of task is mandatory")
         String title,
@@ -18,5 +20,7 @@ public record TaskRequestDto (
         TaskPriority priority,
 
         @NotNull(message = "ID is mandatory")
-        Long boardId
+        Long boardId,
+
+        LocalDateTime deadline
 ) {}

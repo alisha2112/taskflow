@@ -17,6 +17,7 @@ import com.example.taskflow.repository.TaskRepository;
 import com.example.taskflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.aspectj.weaver.ast.Not;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -54,6 +55,7 @@ public class TaskService {
         task.setDescription(dto.description());
         task.setStatus(dto.status());
         task.setPriority(dto.priority());
+        task.setDeadline(dto.deadline());
         task.setBoard(board);
 
         Task savedTask = taskRepository.save(task);
@@ -84,6 +86,7 @@ public class TaskService {
         task.setDescription(dto.description());
         task.setStatus(dto.status());
         task.setPriority(dto.priority());
+        task.setDeadline(dto.deadline());
 
         Task savedTask = taskRepository.save(task);
         TaskResponseDto responseDto = mapToResponse(savedTask);
@@ -119,6 +122,10 @@ public class TaskService {
 
         if (dto.priority() != null) {
             task.setPriority(dto.priority());
+        }
+
+        if (dto.deadline() != null) {
+            task.setDeadline(dto.deadline());
         }
 
         Task savedTask = taskRepository.save(task);
@@ -169,6 +176,25 @@ public class TaskService {
         sendBoardUpdate(task.getBoard().getId(), EventType.TASK_UPDATED, responseDto);
 
         return responseDto;
+    }
+
+    @Transactional
+    public void sendDeadlineWarning(Task task) {
+        if (task.getAssignee() == null) {
+            return;
+        }
+
+        NotificationDto notification = new NotificationDto(
+                "Warning! The deadline for the task:" + task.getTitle() + " expires in 24 hours.",
+                task.getId(),
+                task.getBoard().getId(),
+                "DEADLINE_WARNING"
+        );
+
+        String destination = "/topic/user/" + task.getAssignee().getEmail() + "/notifications";
+
+        log.info("Sending deadline warning for Task ID={} to User={}", task.getId(), task.getAssignee().getEmail());
+        messagingTemplate.convertAndSend(destination, notification);
     }
 
     private void sendNotificationToUser(String username, Task task) {
