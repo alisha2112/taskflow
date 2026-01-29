@@ -33,7 +33,7 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final BoardRepository boardRepository;
     private final UserRepository userRepository;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final NotificationService notificationService;
 
     @Transactional(readOnly = true)
     @Cacheable(value = "tasks", key = "{#boardId, #priority != null ? #priority.name() : 'null', #assigneeId != null ? #assigneeId : 'null'}")
@@ -64,7 +64,7 @@ public class TaskService {
         log.info("Task created: ID={} Title='{}' BoardID={} by UserID={}",
                 savedTask.getId(), savedTask.getTitle(), board.getId(), userId);
 
-        sendBoardUpdate(board.getId(), EventType.TASK_CREATED, responseDto);
+        notificationService.sendBoardUpdate(board.getId(), EventType.TASK_CREATED, responseDto);
 
         return responseDto;
     }
@@ -91,7 +91,7 @@ public class TaskService {
         Task savedTask = taskRepository.save(task);
         TaskResponseDto responseDto = mapToResponse(savedTask);
 
-        sendBoardUpdate(task.getBoard().getId(), EventType.TASK_UPDATED, responseDto);
+        notificationService.sendBoardUpdate(task.getBoard().getId(), EventType.TASK_UPDATED, responseDto);
 
         return responseDto;
     }
@@ -131,7 +131,7 @@ public class TaskService {
         Task savedTask = taskRepository.save(task);
         TaskResponseDto responseDto = mapToResponse(savedTask);
 
-        sendBoardUpdate(task.getBoard().getId(), EventType.TASK_UPDATED, responseDto);
+        notificationService.sendBoardUpdate(task.getBoard().getId(), EventType.TASK_UPDATED, responseDto);
 
         return responseDto;
     }
@@ -149,7 +149,7 @@ public class TaskService {
 
         log.info("Task archived: ID={} by UserID={}", taskId, userId);
 
-        sendBoardUpdate(task.getBoard().getId(), EventType.TASK_DELETED, mapToResponse(savedTask));
+        notificationService.sendBoardUpdate(task.getBoard().getId(), EventType.TASK_DELETED, mapToResponse(savedTask));
     }
     
     @Transactional
@@ -164,7 +164,8 @@ public class TaskService {
                     .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + assigneeId));
             task.setAssignee(assignee);
             log.info("Task assigned: ID={} to UserID={} by OwnerID={}", taskId, assigneeId, userId);
-            sendNotificationToUser(assignee.getEmail(), task);
+//            sendNotificationToUser(assignee.getEmail(), task);
+            notificationService.sendPrivateNotification(task);
         } else {
             task.setAssignee(null);
             log.info("Task unassigned: ID={} by OwnerID={}", taskId, userId);
@@ -173,48 +174,9 @@ public class TaskService {
         Task savedTask = taskRepository.save(task);
         TaskResponseDto responseDto = mapToResponse(savedTask);
 
-        sendBoardUpdate(task.getBoard().getId(), EventType.TASK_UPDATED, responseDto);
+        notificationService.sendBoardUpdate(task.getBoard().getId(), EventType.TASK_UPDATED, responseDto);
 
         return responseDto;
-    }
-
-    @Transactional
-    public void sendDeadlineWarning(Task task) {
-        if (task.getAssignee() == null) {
-            return;
-        }
-
-        NotificationDto notification = new NotificationDto(
-                "Warning! The deadline for the task:" + task.getTitle() + " expires in 24 hours.",
-                task.getId(),
-                task.getBoard().getId(),
-                "DEADLINE_WARNING"
-        );
-
-        String destination = "/topic/user/" + task.getAssignee().getEmail() + "/notifications";
-
-        log.info("Sending deadline warning for Task ID={} to User={}", task.getId(), task.getAssignee().getEmail());
-        messagingTemplate.convertAndSend(destination, notification);
-    }
-
-    private void sendNotificationToUser(String username, Task task) {
-        NotificationDto notification = new NotificationDto(
-                "You have been assigned to a task: " + task.getTitle(),
-                task.getId(),
-                task.getBoard().getId(),
-                "ASSIGNMENT"
-        );
-
-        log.debug("Sending private notification to user {} ", username);
-        messagingTemplate.convertAndSendToUser(username, "/queue/notifications", notification);
-    }
-
-    private void sendBoardUpdate(Long boardId, EventType eventType, TaskResponseDto taskDto) {
-        String destination = "/topic/board/" + boardId;
-        TaskEventDto event = new TaskEventDto(eventType, boardId, taskDto);
-
-        log.info("Sending WebSocket event {} to {}", eventType, destination);
-        messagingTemplate.convertAndSend(destination, event);
     }
 
     private Board validateBoardAccess(Long boardId, Long userId) {
