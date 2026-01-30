@@ -20,8 +20,8 @@ import java.util.List;
 public class TaskController {
     private final TaskService taskService;
 
-    @GetMapping("/board/{boardId}")
-    public List<TaskResponseDto> getByBoard(@PathVariable Long boardId,
+    @GetMapping
+    public List<TaskResponseDto> getByBoard(@RequestParam Long boardId,
                                             @AuthenticationPrincipal User currentUser,
                                             @RequestParam(required = false) TaskPriority priority,
                                             @RequestParam(required = false) Long assigneeId) {
